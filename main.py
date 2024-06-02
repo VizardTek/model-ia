@@ -3,6 +3,14 @@ from ultralytics import YOLO
 import math
 import requests
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+AUTHORIZATION = os.getenv('AUTHORIZATION')
+SERVER_URL = os.getenv('SERVER_URL')
+
 # Load your trained model
 model = YOLO('best-fire-smoke-only.pt')
 
@@ -23,7 +31,7 @@ if not cap.isOpened():
 else:
     frame_width = int(cap.get(3))
     frame_height = int(cap.get(4))
-    out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (frame_width, frame_height))
+    out = cv2.VideoWriter('zefuiyzeoafuzaife.mp4', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (frame_width, frame_height))
 
     while True:
         success, img = cap.read()
@@ -73,7 +81,7 @@ else:
                                 print('SEND ALERTTTT')
                                 headers = {
                                     'Content-Type': 'application/json',
-                                    "Authorization": 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjoiNjY1OTkxYWU3ODI3ZTI0NGNjNjgwMzVlIiwiX2lkIjoiNjY1OTgzMGU3ODI3ZTI0NGNjNjdmZWVlIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzE3MTQ2MDMwLCJleHAiOjE3MTczMTg4MzB9.E4G2NE624sS-JiGo788RoBTBbdGgtXIcPUZ-CIe1Yr8'
+                                    "Authorization": AUTHORIZATION
                                 }
 
                                 data = {
@@ -81,12 +89,12 @@ else:
                                     "alertData": { "title": "ALERTE FEU", "body": f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}%"}
                                 }
 
-                                print(requests.post('http://192.168.137.1:4000/api/alerting/alert', json=data, headers=headers).json())
+                                print(requests.post(f'{SERVER_URL}/api/alerting/alert', json=data, headers=headers).json())
 
                             elif count > 10:
                                 count = 0
                 pass
-            out.write(img)
+            cv2.imshow("Image", img)
             if cv2.waitKey(1) == ord('q'):
                 break
 

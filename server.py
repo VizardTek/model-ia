@@ -5,36 +5,32 @@ import threading
 import time
 import uuid
 import math
+import os
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+AUTHORIZATION = os.getenv('AUTHORIZATION')
+SERVER_URL = os.getenv('SERVER_URL')
+PORT = os.getenv('PORT')
 
 from ultralytics import YOLO
 
 app = Flask(__name__)
 
-
 cameras = []
 threads = []
 
 def fire_detection(camera):
-
-    print("camera", camera)
-
-    print("url", camera["url"])
-
-    # print("device_id", device_id)
-    # print("name", name)
-    # print("url", url)
-    # Load your trained model
     model = YOLO('best-fire-smoke-only.pt')
 
-    # Open a video file
+    if os.name == 'nt':  # Windows
+        cap = cv2.VideoCapture(int(camera["url"][-1]), cv2.CAP_DSHOW)
+    else:
+        cap = cv2.VideoCapture(int(camera["url"][-1]))
 
-    cap = cv2.VideoCapture(int(camera["url"][-1]))  # Read the video file
-    # video_path = 'fire.mp4'
-    # cap = cv2.VideoCapture(video_path)
-
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)
-    # counter = 0``
-    frame_skip = 30  # Number of frames to skip
     frame_count = 30  # Frame counter
     count = 0
     countNoFire = 0
@@ -43,9 +39,6 @@ def fire_detection(camera):
     if not cap.isOpened():
         print("Error opening video file")
     else:
-        frame_width = int(cap.get(3))
-        frame_height = int(cap.get(4))
-        out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (frame_width, frame_height))
 
         while True:
             success, img = cap.read()
@@ -68,14 +61,11 @@ def fire_detection(camera):
 
                     # confidence
                     confidence = math.ceil((box.conf[0] * 100))
-                    # print("Confidence --->", confidence)
 
                     # class name
                     cls = int(box.cls[0])
 
-                    # print("Class name -->", classNames[cls])
-
-                        # object details
+                    # object details
                     org = [x1, y1]
                     font = cv2.FONT_HERSHEY_SIMPLEX
                     fontScale = 1
@@ -90,39 +80,29 @@ def fire_detection(camera):
                         set_fire = True
 
                         if set_fire:
-                            print('COUNTTTTTTTT ',count)
                             cv2.putText(img, classNames[cls] + " " + str(confidence), org, font, fontScale, color, thickness)
                             if confidence > 70 :
                                 count = count + 1
-                                print("feu detectÃ©")
+
+                                print('count ',count)
                                 if count == 10:
-                                    print('SEND ALERTTTT')
                                     headers = {
                                         'Content-Type': 'application/json',
-                                        "Authorization": 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjoiNjY1OWRiMzc2ZjcwMGIwOGFlZjBkZDNlIiwiX2lkIjoiNjY1OWQ3ZDc2ZjcwMGIwOGFlZjBkZDM3Iiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzE3MTY2Nzc3LCJleHAiOjE3MTczMzk1Nzd9.3-bUMc2y4LaPLZBZW6F8blhsTjzMVreuLiZ4SYRi-Js'
+                                        "Authorization": AUTHORIZATION
                                     }
 
-                                    # data = {
-                                    #     'id': frame_count, 
-                                    #     "alertData": { "title": "ALERTE FEU", "body": f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}% sur la pièce {name} avec l'id {device_id}"}
-                                    # }
+                                    data = {
+                                        'id': frame_count, 
+                                        "alertData": { "title": "ALERTE FEU", "body": f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}% sur la pièce {camera['name']} avec l'id {camera['device_id']}"}
+                                    }
 
+                                    print(requests.post(f'{SERVER_URL}/api/alerting/alert', json=data, headers=headers).json())
 
-                                    # print(requests.post('http://192.168.137.1:4000/api/alerting/alert', json=data, headers=headers).json())
+                                    print(f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}% sur la pièce {camera['name']} avec l'id {camera['device_id']}")
 
                                 elif count > 10:
                                     count = 0
-                    """ else:
-                        countNoFire += 1
-                        if(countNoFire == 10):
-                            count = 0 """
-                        
                     pass
-                        
-
-                    # cv2.putText(img, classNames[cls], org, font, fontScale, color, thickness)
-
-                out.write(img)
                 if cv2.waitKey(1) == ord('q'):
                     break
 
@@ -131,14 +111,9 @@ def fire_detection(camera):
 
 
 def find_available_cameras():
-
-   
     max_attempts = 100
     newCams = []
     global cameras
-
-    cameras = [{'device_id': '20ed4948-abfe-4819-b741-78d451711856', 'name': 'Cam0', 'url': '/camera/0'}, {'device_id': 'c99edacb-0903-4214-9594-d8818a09bb74', 'name': 'Cam1', 'url': '/camera/1'}]
-
     print("Trying to find cams")
 
     for i in range(max_attempts):
@@ -162,20 +137,12 @@ def find_available_cameras():
             newCams.append(camObj)
 
             cameras = newCams
-
-            print("caaaaaaaaaaaaaaaaa", cameras)
             print(f"Camera {i} is available.")
 
             for camera in cameras:
-
-                print("camera", camera)
-
-                # print(de)
                 thread = threading.Thread(target=fire_detection, args=(camera,))
                 threads.append(thread)
                 thread.start()
-                
-            # fire_detection()
         else:
             # Indicate which camera is not available
             print(f"Camera {i} is not available.")
@@ -257,6 +224,5 @@ def video_feed(camera_index):
 
 
 if __name__ == "__main__":
-    # update_cameras_on_api()
     find_available_cameras()
-    app.run(host='0.0.0.0', port=8000)
+    app.run(host='0.0.0.0', port=PORT)
