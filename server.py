@@ -6,7 +6,7 @@ import time
 import uuid
 import math
 import os
-
+from ultralytics import YOLO
 from dotenv import load_dotenv
 import os
 
@@ -16,12 +16,15 @@ AUTHORIZATION = os.getenv('AUTHORIZATION')
 SERVER_URL = os.getenv('SERVER_URL')
 PORT = os.getenv('PORT')
 
-from ultralytics import YOLO
-
 app = Flask(__name__)
 
 cameras = []
 threads = []
+
+headers = {
+    'Content-Type': 'application/json',
+    "Authorization": AUTHORIZATION
+}
 
 def fire_detection(camera):
     model = YOLO('best-fire-smoke-only.pt')
@@ -83,21 +86,14 @@ def fire_detection(camera):
                             cv2.putText(img, classNames[cls] + " " + str(confidence), org, font, fontScale, color, thickness)
                             if confidence > 70 :
                                 count = count + 1
-
                                 print('count ',count)
                                 if count == 10:
-                                    headers = {
-                                        'Content-Type': 'application/json',
-                                        "Authorization": AUTHORIZATION
-                                    }
-
                                     data = {
                                         'id': frame_count, 
-                                        "alertData": { "title": "ALERTE FEU", "body": f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}% sur la pièce {camera['name']} avec l'id {camera['device_id']}"}
+                                        "alertData": { "title": "ALERTE FEU", "body": f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}% sur la pièce {camera['name']}"}
                                     }
 
                                     print(requests.post(f'{SERVER_URL}/api/alerting/alert', json=data, headers=headers).json())
-
                                     print(f"ALERTE FEU DETECTE AVEC UNE CONFIANCE DE {confidence}% sur la pièce {camera['name']} avec l'id {camera['device_id']}")
 
                                 elif count > 10:
@@ -153,9 +149,8 @@ def find_available_cameras():
 
 
 def update_cameras_on_api():
-    posturl = "http://192.168.137.1:4000/api/sensors/cameras"
-    geturl = "http://192.168.137.1:4000/api/cameras"
-    headers = {"Content-Type": "application/json"}
+    posturl = f"{SERVER_URL}/api/sensors/cameras"
+    geturl = f"{SERVER_URL}/api/cameras"
     
     try:
         # Fetch the current list of registered camera device_ids from the backend
@@ -224,5 +219,6 @@ def video_feed(camera_index):
 
 
 if __name__ == "__main__":
+    update_cameras_on_api()
     find_available_cameras()
     app.run(host='0.0.0.0', port=PORT)
