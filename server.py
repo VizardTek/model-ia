@@ -117,12 +117,13 @@ def find_available_cameras():
         cap = cv2.VideoCapture(i)
         if cap.isOpened():  # Check if the camera is available
             cap.release()
-            # Generate a unique device_id
-            device_id = str(uuid.uuid4())
 
             # Construct the name
             name = "Cam" + str(i)
 
+            # Generate a unique device_id
+            device_id = f'uuid{name}'
+            
             # Check if a camera with the same name already exists
            
             camObj = {
